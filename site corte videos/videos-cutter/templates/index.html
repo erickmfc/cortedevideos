@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cortador de Vídeo</title>
+    <style>
+        /* Reset básico */
+        body, h1, input, button {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f3f4f6;
+            color: #333;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        form input, form button {
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        form input:focus {
+            outline: none;
+            border-color: #007BFF;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        }
+
+        form button {
+            background-color: #007BFF;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        form button:hover {
+            background-color: #0056b3;
+        }
+
+        .message {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .progress-bar-container {
+            position: relative;
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #4caf50;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <form id="videoForm" method="POST" enctype="multipart/form-data">
+        <h1>Cortador de Vídeo</h1>
+        <label for="file">Selecione um vídeo:</label>
+        <input type="file" id="file" name="file" accept="video/*" required>
+
+        <label for="segmento_duracao">Duração do segmento (segundos):</label>
+        <input type="number" id="segmento_duracao" name="segmento_duracao" value="10" min="1" required>
+
+        <label for="intervalo_remocao">Intervalo de remoção (segundos):</label>
+        <input type="number" id="intervalo_remocao" name="intervalo_remocao" value="2" min="0" required>
+
+        <button type="submit">Cortar Vídeo</button>
+    </form>
+
+    <div id="message" class="message"></div>
+    <div class="progress-bar-container" id="progressBarContainer">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("videoForm");
+            const messageDiv = document.getElementById("message");
+            const progressBarContainer = document.getElementById("progressBarContainer");
+            const progressBar = document.getElementById("progressBar");
+
+            form.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                messageDiv.style.display = "none";
+                progressBarContainer.style.display = "block";
+                progressBar.style.width = "0%";
+
+                const formData = new FormData(form);
+
+                try {
+                    const response = await fetch("/", {
+                        method: "POST",
+                        body: formData,
+                    });
+
+                    const xhr = new XMLHttpRequest();
+                    xhr.upload.addEventListener("progress", (event) => {
+                        if (event.lengthComputable) {
+                            const percentComplete = Math.round((event.loaded / event.total) * 100);
+                            progressBar.style.width = `${percentComplete}%`;
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        const errorMessage = errorData.error || `Erro ${response.status} ao processar o vídeo.`;
+                        throw new Error(errorMessage);
+                    }
+
+                    const result = await response.json();
+
+                    messageDiv.textContent = result.message;
+                    messageDiv.className = "message success";
+                    messageDiv.style.display = "block";
+                    progressBar.style.width = "100%";
+
+                    if (result.download_link) {
+                        const link = document.createElement("a");
+                        link.href = result.download_link;
+                        link.download = "";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } else {
+                        console.error("Link de download não recebido na resposta:", result);
+                        messageDiv.textContent = "Erro: Link de download ausente.";
+                        messageDiv.className = "message error";
+                        messageDiv.style.display = "block";
+                    }
+
+                } catch (error) {
+                    console.error("Erro durante a requisição:", error);
+                    messageDiv.textContent = error.message || "Ocorreu um erro inesperado.";
+                    messageDiv.className = "message error";
+                    messageDiv.style.display = "block";
+                } finally {
+                    progressBarContainer.style.display = "none";
+                }
+            });
+        });
+    </script>
+</body>
+</html>
